@@ -8,7 +8,8 @@ import json_tricks as json
 import mmcv
 import mmengine
 import numpy as np
-
+import sys 
+sys.path.append('/research/d4/rshr/yyliu/code/mmpose/')
 from mmpose.apis import inference_topdown
 from mmpose.apis import init_model as init_pose_estimator
 from mmpose.evaluation.functional import nms
@@ -63,12 +64,7 @@ def process_one_image(args, img_path, detector, pose_estimator, visualizer,
     # if there is no instance detected, return None
     return data_samples.get('pred_instances', None)
 
-
-def main():
-    """Visualize the demo images.
-
-    Using mmdet to detect the human.
-    """
+def main_parse_args():
     parser = ArgumentParser()
     parser.add_argument('det_config', help='Config file for detection')
     parser.add_argument('det_checkpoint', help='Checkpoint file for detection')
@@ -138,7 +134,7 @@ def main():
 
     args = parser.parse_args()
 
-    assert args.show or (args.output_root != '')
+    #assert args.show or (args.output_root != '')
     assert args.input != ''
     assert args.det_config is not None
     assert args.det_checkpoint is not None
@@ -148,7 +144,13 @@ def main():
         assert args.output_root != ''
         args.pred_save_path = f'{args.output_root}/results_' \
             f'{os.path.splitext(os.path.basename(args.input))[0]}.json'
+    return args
+def main(args,imgsavepath, predsavepath):
+    """Visualize the demo images.
 
+    Using mmdet to detect the human.
+    """
+    
     # build detector
     detector = init_detector(
         args.det_config, args.det_checkpoint, device=args.device)
@@ -174,7 +176,7 @@ def main():
     if input_type == 'image':
         pred_instances = process_one_image(
             args,
-            args.input,
+            imgsavepath,
             detector,
             pose_estimator,
             visualizer,
@@ -220,15 +222,35 @@ def main():
             f'file {os.path.basename(args.input)} has invalid format.')
 
     if args.save_predictions:
-        with open(args.pred_save_path, 'w') as f:
+        with open(predsavepath, 'w') as f:
             json.dump(
                 dict(
                     meta_info=pose_estimator.dataset_meta,
                     instance_info=pred_instances_list),
                 f,
                 indent='\t')
-        print(f'predictions have been saved at {args.pred_save_path}')
+        print(f'predictions have been saved at {predsavepath}')
 
 
 if __name__ == '__main__':
-    main()
+    #main()
+    example_json = '/research/d4/rshr/yyliu/data/coco/annotations/person_keypoints_val2017.json'
+    #lxjson='/research/d4/rshr/yyliu/code/movenet/data/nlx_add_aist/annotations/nlx_add_aist_val.json'
+    with open(example_json) as f:
+        example = json.load(f)
+    #with open(lxjson) as f1:
+    #    lx=json.load(f1)
+
+    new_train={}
+    new_train['info'] = example['info']
+    new_train['licenses'] = example['licenses']
+    new_train['categories'] = example['categories']
+    new_train['images'] = []
+    new_train['annotations'] = []
+    idx=700000
+    inpath='/research/d4/rshr/yyliu/code/movenet/data/23220minhaodata/220newdata'
+    files=os.listdir(inpath)
+    args=main_parse_args()
+    for i in files:
+        name=i.split('.')[0]
+        main(args,os.path.join(inpath,i),os.path.join(args.output_root,'result_'+name+'.json'))

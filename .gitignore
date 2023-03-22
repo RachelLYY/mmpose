@@ -47,7 +47,8 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
-
+testout/
+mmdeploy-1.0.0rc3-linux-x86_64-onnxruntime1.8.1/
 # Translations
 *.mo
 *.pot
