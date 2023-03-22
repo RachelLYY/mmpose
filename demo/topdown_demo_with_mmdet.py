@@ -23,7 +23,25 @@ try:
 except (ImportError, ModuleNotFoundError):
     has_mmdet = False
 
-
+def convtojson(id,subid,name,pred_instances):
+    kpts=pred_instances['keypoints'][0].tolist()
+    scores=pred_instances['keypoint_scores'][0].tolist()
+    bbox=pred_instances['bboxes'][0].tolist()
+    area=bbox[2]*bbox[3]
+    curimg={'id':id,'file_name':name,'width':640,'height':480}
+    curanno={'id':subid,'image_id':id,'category_id': 1,'num_keypoints': 17,\
+    'area':area,'bbox':bbox}
+    # 多人场景?
+    '''kptformat=[]
+    for k in range(len(kpts)):
+        v=kpts[k]
+        v.append(scores[k])
+        kptformat.append(v)'''
+    kptformat=[kpts[k].append(scores[k]) for k in range(len(kpts))]
+    curanno['keypoints']=kpts
+    new_train['images'].append(curimg)
+    new_train['annotations'].append(curanno)
+    #return pred_instances
 def process_one_image(args, img_path, detector, pose_estimator, visualizer,
                       show_interval):
     """Visualize predicted keypoints (and heatmaps) of one image."""
@@ -144,34 +162,17 @@ def main_parse_args():
         assert args.output_root != ''
         args.pred_save_path = f'{args.output_root}/results_' \
             f'{os.path.splitext(os.path.basename(args.input))[0]}.json'
+    
     return args
 def main(args,imgsavepath, predsavepath):
     """Visualize the demo images.
 
     Using mmdet to detect the human.
     """
+
     
-    # build detector
-    detector = init_detector(
-        args.det_config, args.det_checkpoint, device=args.device)
-    detector.cfg = adapt_mmdet_pipeline(detector.cfg)
-
     # build pose estimator
-    pose_estimator = init_pose_estimator(
-        args.pose_config,
-        args.pose_checkpoint,
-        device=args.device,
-        cfg_options=dict(
-            model=dict(test_cfg=dict(output_heatmaps=args.draw_heatmap))))
-
-    # init visualizer
-    pose_estimator.cfg.visualizer.radius = args.radius
-    pose_estimator.cfg.visualizer.line_width = args.thickness
-    visualizer = VISUALIZERS.build(pose_estimator.cfg.visualizer)
-    # the dataset_meta is loaded from the checkpoint and
-    # then pass to the model in init_pose_estimator
-    visualizer.set_dataset_meta(pose_estimator.dataset_meta)
-
+    
     input_type = mimetypes.guess_type(args.input)[0].split('/')[0]
     if input_type == 'image':
         pred_instances = process_one_image(
@@ -181,6 +182,11 @@ def main(args,imgsavepath, predsavepath):
             pose_estimator,
             visualizer,
             show_interval=0)
+        for ipred in pred_instances:
+            global subidx
+            global idx
+            convtojson(idx,subidx,os.path.basename(imgsavepath),ipred)
+            subidx+=1
         pred_instances_list = split_instances(pred_instances)
 
     elif input_type == 'video':
@@ -222,13 +228,13 @@ def main(args,imgsavepath, predsavepath):
             f'file {os.path.basename(args.input)} has invalid format.')
 
     if args.save_predictions:
-        with open(predsavepath, 'w') as f:
+        '''with open(predsavepath, 'w') as f:
             json.dump(
                 dict(
                     meta_info=pose_estimator.dataset_meta,
                     instance_info=pred_instances_list),
                 f,
-                indent='\t')
+                indent='\t')'''
         print(f'predictions have been saved at {predsavepath}')
 
 
@@ -248,9 +254,36 @@ if __name__ == '__main__':
     new_train['images'] = []
     new_train['annotations'] = []
     idx=700000
-    inpath='/research/d4/rshr/yyliu/code/movenet/data/23220minhaodata/220newdata'
+    subidx=700000
+    inpath='/research/d4/rshr/yyliu/code/movenet/data/23321testdata/videoImages'
     files=os.listdir(inpath)
     args=main_parse_args()
+    # build detector
+    detector = init_detector(
+        args.det_config, args.det_checkpoint, device=args.device)
+    detector.cfg = adapt_mmdet_pipeline(detector.cfg)
+    pose_estimator = init_pose_estimator(
+        args.pose_config,
+        args.pose_checkpoint,
+        device=args.device,
+        cfg_options=dict(
+            model=dict(test_cfg=dict(output_heatmaps=args.draw_heatmap))))
+
+    # init visualizer
+    pose_estimator.cfg.visualizer.radius = args.radius
+    pose_estimator.cfg.visualizer.line_width = args.thickness
+    visualizer = VISUALIZERS.build(pose_estimator.cfg.visualizer)
+    # the dataset_meta is loaded from the checkpoint and
+    # then pass to the model in init_pose_estimator
+    visualizer.set_dataset_meta(pose_estimator.dataset_meta)
     for i in files:
         name=i.split('.')[0]
+        imgpath='/research/d4/rshr/yyliu/code/movenet/data/23220minhaodata/220newdata/152.jpg'
         main(args,os.path.join(inpath,i),os.path.join(args.output_root,'result_'+name+'.json'))
+        print(os.path.join(inpath,i))
+        #main(idx,subidx,args,imgpath,os.path.join(args.output_root,'result_'+name+'.json'))
+        idx+=1
+        subidx+=1
+    with open('/research/d4/rshr/yyliu/code/movenet/data/23321testdata/litehrnet.json','w') as f:
+        json.dump(new_train,f)
+        
